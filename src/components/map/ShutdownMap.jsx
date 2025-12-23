@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Circle, Marker, Polygon, Polyline, Popup, useMap } from 'react-leaflet';
+import React, { useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Circle, Marker, Polygon, Polyline, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -11,13 +11,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const reasonColors = {
-  weather: '#3B82F6',
-  accident: '#EF4444',
-  construction: '#F59E0B',
-  event: '#8B5CF6',
-  emergency: '#DC2626',
-  other: '#6B7280'
+const actionColors = {
+  shutdown_all: '#EF4444',      // red
+  shutdown_b_only: '#A855F7',   // purple
+  caution: '#EAB308'            // yellow
 };
 
 const clearedColor = '#9CA3AF';
@@ -45,26 +42,49 @@ function FitBounds({ shutdowns }) {
   return null;
 }
 
-export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId }) {
-  const filteredShutdowns = shutdowns.filter(s => s.status === 'active');
+export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId, hoveredId }) {
+  const shapeRefs = useRef({});
+
+  useEffect(() => {
+    if (hoveredId) {
+      const ref = shapeRefs.current[hoveredId];
+      if (ref) {
+        ref.openTooltip();
+      }
+    } else {
+      // Close all tooltips when not hovering
+      Object.values(shapeRefs.current).forEach(ref => {
+        if (ref) ref.closeTooltip();
+      });
+    }
+  }, [hoveredId]);
 
   const getColor = (shutdown) => {
     if (shutdown.status === 'cleared') return clearedColor;
-    return reasonColors[shutdown.reason] || reasonColors.other;
+    return actionColors[shutdown.action] || actionColors.shutdown_all;
   };
 
   const renderShutdown = (shutdown) => {
     const color = getColor(shutdown);
     const opacity = shutdown.status === 'cleared' ? 0.3 : 0.5;
     const isSelected = selectedId === shutdown.id;
-    const weight = isSelected ? 4 : 2;
+    const isHovered = hoveredId === shutdown.id;
+    const weight = isSelected ? 5 : isHovered ? 4 : 2;
+    const fillOpacity = isSelected 
+      ? (shutdown.status === 'cleared' ? 0.5 : 0.7) 
+      : isHovered 
+        ? (shutdown.status === 'cleared' ? 0.5 : 0.65)
+        : opacity;
 
     const popupContent = (
-      <div className="min-w-[200px]">
-        <h3 className="font-semibold text-sm">{shutdown.title}</h3>
-        <p className="text-xs text-gray-600 capitalize mt-1">{shutdown.reason}</p>
+      <div className="max-w-[20vw] min-w-[150px]">
+        <h3 className="font-semibold text-sm break-words whitespace-normal">{shutdown.title}</h3>
+        <p className="text-xs text-gray-600 capitalize mt-1 break-words whitespace-normal">{shutdown.reason}</p>
         {shutdown.radius_km && (
-          <p className="text-xs text-gray-500">{shutdown.radius_km}km radius</p>
+          <p className="text-xs text-gray-500 break-words whitespace-normal">{shutdown.radius_km}km radius</p>
+        )}
+        {shutdown.notes && (
+          <p className="text-xs text-gray-600 mt-1 break-words whitespace-normal">{shutdown.notes}</p>
         )}
         <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${
           shutdown.status === 'active' 
@@ -81,19 +101,20 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
         return (
           <Circle
             key={shutdown.id}
+            ref={el => { if (el) shapeRefs.current[shutdown.id] = el; }}
             center={[shutdown.center_lat, shutdown.center_lng]}
             radius={shutdown.radius_km * 1000}
             pathOptions={{ 
               color, 
               fillColor: color, 
-              fillOpacity: opacity,
+              fillOpacity,
               weight 
             }}
             eventHandlers={{
               click: () => onSelectShutdown(shutdown)
             }}
           >
-            <Popup>{popupContent}</Popup>
+            <Tooltip>{popupContent}</Tooltip>
           </Circle>
         );
       
@@ -101,12 +122,13 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
         return (
           <Marker
             key={shutdown.id}
+            ref={el => { if (el) shapeRefs.current[shutdown.id] = el; }}
             position={[shutdown.center_lat, shutdown.center_lng]}
             eventHandlers={{
               click: () => onSelectShutdown(shutdown)
             }}
           >
-            <Popup>{popupContent}</Popup>
+            <Tooltip>{popupContent}</Tooltip>
           </Marker>
         );
       
@@ -114,18 +136,19 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
         return (
           <Polygon
             key={shutdown.id}
+            ref={el => { if (el) shapeRefs.current[shutdown.id] = el; }}
             positions={shutdown.coordinates || []}
             pathOptions={{ 
               color, 
               fillColor: color, 
-              fillOpacity: opacity,
+              fillOpacity,
               weight 
             }}
             eventHandlers={{
               click: () => onSelectShutdown(shutdown)
             }}
           >
-            <Popup>{popupContent}</Popup>
+            <Tooltip>{popupContent}</Tooltip>
           </Polygon>
         );
       
@@ -133,6 +156,7 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
         return (
           <Polyline
             key={shutdown.id}
+            ref={el => { if (el) shapeRefs.current[shutdown.id] = el; }}
             positions={shutdown.coordinates || []}
             pathOptions={{ 
               color, 
@@ -142,7 +166,7 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
               click: () => onSelectShutdown(shutdown)
             }}
           >
-            <Popup>{popupContent}</Popup>
+            <Tooltip>{popupContent}</Tooltip>
           </Polyline>
         );
       
@@ -162,8 +186,8 @@ export default function ShutdownMap({ shutdowns, onSelectShutdown, selectedId })
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitBounds shutdowns={filteredShutdowns} />
-      {filteredShutdowns.map(renderShutdown)}
+      <FitBounds shutdowns={shutdowns} />
+      {shutdowns.map(renderShutdown)}
     </MapContainer>
   );
 }

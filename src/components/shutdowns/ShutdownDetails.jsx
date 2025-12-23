@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import {
   Sheet,
@@ -16,8 +16,11 @@ import {
   User,
   FileText,
   Trash2,
-  Pencil
+  Pencil,
+  History
 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import HistorySheet from './HistorySheet';
 
 export default function ShutdownDetails({ 
   shutdown, 
@@ -28,9 +31,28 @@ export default function ShutdownDetails({
   onEdit,
   loading 
 }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await base44.auth.me();
+        setCurrentUser(user);
+      } catch (error) {
+        // User not logged in - treat as driver (view-only)
+        setCurrentUser({ access_level: 'driver', full_name: 'Driver (Guest)', email: '' });
+      }
+    };
+    fetchUser();
+  }, []);
+
   if (!shutdown) return null;
 
   const isActive = shutdown.status === 'active';
+  const isAdmin = currentUser?.role === 'admin';
+  const userAccessLevel = currentUser?.access_level || currentUser?.role || 'driver';
+  const isDriver = userAccessLevel === 'driver';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -127,40 +149,63 @@ export default function ShutdownDetails({
           <Separator />
 
           <div className="space-y-3">
-            {isActive && (
-              <>
-                <Button
-                  onClick={() => onEdit(shutdown)}
-                  disabled={loading}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit Shutdown
-                </Button>
-                <Button
-                  onClick={() => onClear(shutdown)}
-                  disabled={loading}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Mark as Cleared
-                </Button>
-              </>
+            {currentUser?.email && (
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  setShowHistory(true);
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                <History className="h-4 w-4 mr-2" />
+                View History
+              </Button>
             )}
-            
-            <Button
-              variant="outline"
-              onClick={() => onDelete(shutdown)}
-              disabled={loading}
-              className="w-full text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Permanently
-            </Button>
+
+            {(currentUser?.email && !isDriver) && isActive && (
+              <Button
+                onClick={() => onEdit(shutdown)}
+                disabled={loading}
+                variant="outline"
+                className="w-full"
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Shutdown
+              </Button>
+            )}
+
+            {(currentUser?.email && !isDriver) && isActive && (
+              <Button
+                onClick={() => onClear(shutdown)}
+                disabled={loading}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Mark as Cleared
+              </Button>
+            )}
+
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => onDelete(shutdown)}
+                disabled={loading}
+                className="w-full text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Permanently
+              </Button>
+            )}
           </div>
         </div>
       </SheetContent>
+
+      <HistorySheet
+        shutdown={shutdown}
+        open={showHistory}
+        onOpenChange={setShowHistory}
+      />
     </Sheet>
   );
 }

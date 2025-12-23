@@ -1,13 +1,8 @@
 import { createClient } from '@base44/sdk';
-import { appParams } from '@/lib/app-params';
+// import { getAccessToken } from '@base44/sdk/utils/auth-utils';
 
-const { appId, token, functionsVersion } = appParams;
-
-//Create a client with authentication required
+// Create a client with authentication required
 export const base44 = createClient({
-  appId,
-  token,
-  functionsVersion,
-  serverUrl: '',
-  requiresAuth: false
+  appId: "69455daf2f5e152902217828", 
+  requiresAuth: true // Ensure authentication is required for all operations
 });

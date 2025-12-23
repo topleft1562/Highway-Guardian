@@ -1,6 +1,7 @@
 import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -19,15 +20,18 @@ export default function ShutdownFilters({
   setReasonFilter,
   regionFilter,
   setRegionFilter,
-  regions
+  regions,
+  myShutdownsOnly,
+  setMyShutdownsOnly
 }) {
-  const hasFilters = search || statusFilter !== 'all' || reasonFilter !== 'all' || regionFilter !== 'all';
+  const hasFilters = search || statusFilter !== 'all' || reasonFilter !== 'all' || regionFilter !== 'all' || myShutdownsOnly;
 
   const clearFilters = () => {
     setSearch('');
     setStatusFilter('all');
     setReasonFilter('all');
     setRegionFilter('all');
+    setMyShutdownsOnly(false);
   };
 
   return (
@@ -40,6 +44,20 @@ export default function ShutdownFilters({
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9 bg-white border-gray-200"
         />
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <Checkbox 
+          id="my-shutdowns" 
+          checked={myShutdownsOnly}
+          onCheckedChange={setMyShutdownsOnly}
+        />
+        <label
+          htmlFor="my-shutdowns"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+        >
+          My shutdowns only
+        </label>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -62,10 +80,7 @@ export default function ShutdownFilters({
             <SelectItem value="all">All Reasons</SelectItem>
             <SelectItem value="weather">Weather</SelectItem>
             <SelectItem value="accident">Accident</SelectItem>
-            <SelectItem value="construction">Construction</SelectItem>
-            <SelectItem value="event">Event</SelectItem>
-            <SelectItem value="emergency">Emergency</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
+            <SelectItem value="fires">Fires</SelectItem>
           </SelectContent>
         </Select>
 
